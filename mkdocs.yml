@@ -1,8 +1,9 @@
 site_name: Classificação com MLP
 site_author: Eduardo Selber, Henrique Badin e Lucas Lima.
-site_url: https://hsandmann.github.io/documentation.template
-repo_url: https://github.com/hsandmann/documentation.template
-repo_name: github/documentation.template
+site_url: https://github.com/lucasouzamil/mlp-classification/tree/mkdocs
+repo_url: https://github.com/lucasouzamil/mlp-classification/tree/mkdocs
+repo_name: github/mlp-classification
+
 
 theme:
   name: material
@@ -106,8 +107,8 @@ plugins:
       enable_creation_date: true
   - git-authors
   - git-committers:
-      repository: hsandmann/documentation.template
-      branch: main
+      repository: lucasouzamil/mlp-classification
+      branch: mkdocs
   - search
   - badges
   - minify:
