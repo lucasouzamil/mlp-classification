@@ -105,10 +105,6 @@ plugins:
   - glightbox
   - git-revision-date-localized:
       enable_creation_date: true
-  - git-authors
-  - git-committers:
-      repository: lucasouzamil/mlp-classification
-      branch: main
   - search
   - badges
   - minify:
@@ -135,18 +131,3 @@ extra_javascript:
 
   # Para a implementação do mkdocs-jupyter
   - javascripts/mathjax.js
-
-extra:
-  authors:
-    henrique:
-      name: Henrique Badin
-      avatar: https://github.com/HenriqueFBadin.png
-      url: https://github.com/HenriqueFBadin
-    lucas:
-      name: Lucas Lima
-      avatar: https://github.com/lucasouzamil.png
-      url: https://github.com/lucasouzamil
-    eduardo:
-      name: Eduardo Selber
-      avatar: https://github.com/EduSelber.png
-      url: https://github.com/EduSelber
