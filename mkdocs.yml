@@ -105,10 +105,6 @@ plugins:
   - glightbox
   - git-revision-date-localized:
       enable_creation_date: true
-  - search
-  - badges
-  - minify:
-      minify_html: true
   - markdown-exec
   - render_swagger:
       allow_arbitrary_locations : true
