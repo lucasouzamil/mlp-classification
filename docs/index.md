@@ -96,8 +96,6 @@ O dataset já foi **pré-processado e limpo** pelos autores originais, não apre
 - Duplicatas;
 - Outliers sem explicação evidente.  
 
-A principal dificuldade observada é o **desbalanceamento das classes**, o que exigirá atenção na fase de modelagem (uso de técnicas como *class weighting* ou *resampling*).
-
 ---
 
 ## 3. Data Cleaning and Normalization
