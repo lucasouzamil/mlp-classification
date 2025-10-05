@@ -7,6 +7,8 @@
 2. Henrique Fazzio Badin
 3. Lucas Fernando de Souza Lima
 
+Arquivo Jupyter implementando o MLP ![aqui](https://github.com/lucasouzamil/mlp-classification/blob/mkdocs/main.ipynb).
+
 
 ## 1. Dataset Overview
 
@@ -203,109 +205,337 @@ pca_result = pca.fit_transform(df_scaled[numeric_cols])
 * Variáveis categóricas convertidas por one-hot encoding.
 * Normalização Min–Max aplicada a todas as variáveis numéricas.
 
-
 ## 4. MLP Implementation
-<!-- Implementação da rede neural -->
+
+Para a implementação do MLP consideramos decisões de design sobre arquitetura, funções de ativação, função de perda, inicialização de pesos e hiperparâmetros. A implementação foi feita em **NumPy** para reforçar a compreensão das operações fundamentais (forward, loss, backprop e atualização de pesos). Em seguida detalhamos cada componente.
 
 ### 4.1 Network Architecture
-<!-- Estrutura da rede: número de camadas, neurônios por camada -->
+
+Optou-se por um MLP com duas camadas ocultas:
+
+* **Input:** dimensão `D` (número de features após one-hot + normalização).
+* **Hidden layer 1:** `H1 = 64` neurônios, ativação `tanh`.
+* **Hidden layer 2:** `H2 = 32` neurônios, ativação `tanh`.
+* **Output:** `K` neurônios (número de classes), ativação `softmax`.
+
+Justificativa curta:
+
+* Duas camadas ocultas capturam não linearidades mais complexas que uma única camada sem tornar a rede excessivamente profunda.
+* H1/H2 escolhidos por experimentação empírica: aumentos significativos na largura não trouxeram ganhos relevantes, apenas custo computacional.
 
 ### 4.2 Activation Functions
-<!-- Quais funções de ativação foram usadas e por quê (sigmoid, ReLU, etc.) -->
+
+* **Camadas ocultas:** `tanh`
+
+  * Vantagem: saída centrada em zero, derivada simples (`1 - tanh^2`) e bom comportamento com inicializações escalonadas.
+  * Observação: `ReLU` pode acelerar convergência, mas neste trabalho mantivemos `tanh` por estabilidade e por corresponder ao material do curso.
+* **Camada de saída:** `softmax`
+
+  * Produz probabilidades normalizadas por amostra, adequada para cross-entropy multiclasses.
 
 ### 4.3 Loss Function
-<!-- Tipo de função de perda (ex.: cross-entropy) e motivação -->
 
-### 4.4 Optimization Algorithm
-<!-- Algoritmo de otimização (SGD, Adam, etc.) e parâmetros -->
+* **Cross-entropy (categorical)** combinada com **regularização L2** aplicada a todos os pesos:
 
-### 4.5 Hyperparameters
-<!-- Taxa de aprendizado, épocas, batch size, inicialização, etc. -->
+  [
+  \text{loss} = -\frac{1}{B}\sum_{i=1}^{B} \sum_{k=1}^{K} y_{ik}\log(\hat{y}*{ik}) ;+; \lambda \sum*{\ell} |W^{(\ell)}|^2
+  ]
 
-### 4.6 Implementation Details
-<!-- Bibliotecas usadas (NumPy, PyTorch, etc.) e snippets de código explicativos -->
+  * `B` é o tamanho do mini-batch.
+  * A combinação cross-entropy + softmax simplifica a derivada do output para `(yhat - y_onehot)/B`, o que facilita o cálculo de gradientes.
 
----
+* **Motivação:** cross-entropy penaliza previsões confiantes e erradas de forma mais forte que MSE, sendo padrão em classificação probabilística.
+
+### 4.4 Hyperparameters
+
+Hiperparâmetros selecionados (valores usados nos experimentos):
+
+* **Learning Rate (lr):** `0.005`
+
+  * Testes com 0.001, 0.005 e 0.01 indicaram que 0.005 entregou bom equilíbrio entre velocidade e estabilidade com `tanh`.
+* **Epochs (máx):** `500`
+
+  * Limite superior; o treinamento é interrompido via **early stopping** quando a validação não melhora.
+* **Batch size:** `64`
+
+  * Atualização mais frequente que `128`, com bom trade-off entre estabilidade do gradiente e variação estocástica útil.
+* **Regularization (L2):** `lambda_l2 = 1e-4`
+
+  * Penalização leve que reduz overfitting sem prejudicar aprendizagem.
+* **Patience (early stopping):** `15` épocas sem melhora em `val_loss`.
+* **Inicialização de pesos:** normal padrão com escala `1/sqrt(fan_in)`:
+
+  * ex.: `W = rng.normal(0,1,(out,in)) / sqrt(in)` — reduz saturação inicial e ajuda na estabilidade do treino.
+* **Seed / reproducibility:** `np.random.default_rng(42)` e `random_state=42` nos splits.
+
+Ajustes e recomendações:
+
+* Para acelerar convergência pode-se testar `ReLU + Adam` (optimizers modernos) e `batch normalization`.
+* Para lidar com desbalanceamento usar `class_weight` no loss ou técnicas de oversampling (SMOTE).
+
+### 4.5 Implementation Details
+
+A implementação do MLP foi feita inteiramente em **NumPy**, permitindo controle direto sobre cada etapa — forward pass, cálculo da função de perda, retropropagação e atualização dos parâmetros. Essa abordagem possibilita compreender o fluxo interno de dados e gradientes, sem a abstração de frameworks como PyTorch ou TensorFlow.
+
+Para referência, as etapas de treinamento seguiram o fluxo do material de *Numerical Simulation* do curso, dividido em:
+
+1. **Forward Pass:** os dados são propagados camada a camada;
+2. **Loss Calculation:** cálculo da cross-entropy e penalização L2;
+3. **Backward Pass:** propagação reversa dos gradientes para ajustar pesos e vieses.
+
+```python
+# Forward Pass (propagação)
+z1 = xb @ W1.T + b1; h1 = tanh(z1)
+z2 = h1 @ W2.T + b2; h2 = tanh(z2)
+z3 = h2 @ W3.T + b3; yhat = softmax(z3)
+
+# Cálculo da Loss (cross-entropy + L2)
+loss_ce = -np.mean(np.sum(yb * np.log(yhat + 1e-9), axis=1))
+l2_term = lambda_l2 * (np.sum(W1*W1) + np.sum(W2*W2) + np.sum(W3*W3))
+loss = loss_ce + l2_term
+
+# Backpropagation
+d3 = (yhat - yb) / B
+gW3 = d3.T @ h2 + 2*lambda_l2*W3
+gb3 = d3.sum(axis=0)
+
+dh2 = d3 @ W3
+dz2 = dh2 * (1 - h2**2)
+gW2 = dz2.T @ h1 + 2*lambda_l2*W2
+gb2 = dz2.sum(axis=0)
+
+dh1 = dz2 @ W2
+dz1 = dh1 * (1 - h1**2)
+gW1 = dz1.T @ xb + 2*lambda_l2*W1
+gb1 = dz1.sum(axis=0)
+
+# Atualização dos parâmetros
+W3 -= lr * gW3; b3 -= lr * gb3
+W2 -= lr * gW2; b2 -= lr * gb2
+W1 -= lr * gW1; b1 -= lr * gb1
+```
+
+Durante o treinamento, foram adotadas três práticas fundamentais:
+
+* **Mini-Batch Training:** processa subconjuntos de amostras, aumentando a eficiência e introduzindo ruído estocástico que ajuda na generalização.
+* **Regularização L2:** evita overfitting penalizando pesos muito grandes.
+* **Early Stopping:** interrompe o treino se a perda de validação (`val_loss`) não melhorar após 15 épocas consecutivas, preservando o modelo ótimo.
+
+#### Monitoramento de métricas
+
+Durante as épocas, foram registrados vetores de perda e acurácia para treino e validação:
+
+* `train_losses`, `val_losses`
+* `train_accs`, `val_accs`
+
+Exemplo dos logs registrados:
+
+```
+Época  10 | TrainLoss 0.5499 | ValLoss 0.5394 | TrainAcc 0.793 | ValAcc 0.791
+Época 200 | TrainLoss 0.4619 | ValLoss 0.4555 | TrainAcc 0.826 | ValAcc 0.823
+Early stopping (época 219) melhor val_loss=0.4528
+```
+
+Esses logs mostram uma convergência suave, com perda diminuindo até a época ~200, quando a validação estabiliza, demonstrando equilíbrio entre aprendizado e generalização.
+
+#### Geração das curvas de aprendizado
+
+As curvas de *loss* e *acurácia* foram plotadas para inspeção visual da convergência:
+
+```python
+plt.figure(figsize=(10,4))
+plt.subplot(1,2,1)
+plt.plot(train_losses, label="Train Loss")
+plt.plot(val_losses, label="Val Loss")
+plt.xlabel("Época"); plt.ylabel("Loss"); plt.title("Curva de Loss")
+plt.legend()
+
+plt.subplot(1,2,2)
+plt.plot(train_accs, label="Train Acc")
+plt.plot(val_accs, label="Val Acc")
+plt.xlabel("Época"); plt.ylabel("Acurácia"); plt.title("Curva de Acurácia")
+plt.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Esses gráficos permitem verificar se há overfitting (divergência entre treino e validação) ou underfitting (valores de perda altos e estáveis).
+
+#### Avaliação e checkpoint
+
+Ao final do treino:
+
+* O modelo é restaurado para os pesos do melhor *checkpoint* (menor `val_loss`);
+* Avaliado no conjunto de teste com métricas: **acurácia, precisão, recall e F1-score**;
+* Uma **matriz de confusão** é gerada para análise dos erros;
+* O **decision boundary** é visualizado no espaço 2D via PCA.
+
 
 ## 5. Model Training
-<!-- Processo de treinamento do MLP -->
 
 ### 5.1 Training Setup
-<!-- Estrutura geral do loop de treinamento e hardware utilizado -->
 
-### 5.2 Forward Propagation
-<!-- Descrição conceitual e/ou código do passo de forward -->
+* Dados já codificados e escalados (MinMax).
+* Split feito com `stratify` para preservar proporções de classe (70% train / 15% val / 15% test).
+* Shuffle por época com `rng.permutation`.
 
-### 5.3 Backpropagation
-<!-- Explicação do cálculo dos gradientes e atualização dos pesos -->
+### 5.2 Training Loop (resumo)
 
-### 5.4 Regularization
-<!-- Uso de dropout, L2, early stopping, etc. -->
+* Para cada época:
 
-### 5.5 Training Observations
-<!-- Dificuldades enfrentadas, ajustes necessários, comportamento observado -->
+  * embaralha treino;
+  * itera por mini-batches;
+  * forward → calcula `loss` (+ L2) → backward → atualiza parâmetros;
+  * ao fim da época calcula `train_loss`, `val_loss`, `train_acc`, `val_acc`.
+* Early stopping: interrompe se `val_loss` não melhorar por `patience` épocas.
 
----
+Trechos chave (exemplo do forward, loss e update):
+
+```python
+# forward (mini-batch)
+z1 = xb @ W1.T + b1; h1 = tanh(z1)
+z2 = h1 @ W2.T + b2; h2 = tanh(z2)
+z3 = h2 @ W3.T + b3; yhat = softmax(z3)
+
+# loss CE + L2
+loss_ce = -np.mean(np.sum(yb * np.log(yhat + 1e-9), axis=1))
+l2_term = lambda_l2 * (np.sum(W1*W1) + ...)
+loss = loss_ce + l2_term
+
+# backward (resumo)
+d3 = (yhat - yb) / B
+gW3 = d3.T @ h2 + 2*lambda_l2*W3
+... # calcula gW2,gW1 e gb*
+
+# update
+W3 -= lr * gW3
+...
+```
+
+### 5.3 Training Observations (logs)
+
+Trechos de log produzidos durante treinamento:
+
+```
+Época   1 | TrainLoss 0.9766 | ValLoss 0.8791 | TrainAcc 0.654 | ValAcc 0.653
+Época  10 | TrainLoss 0.5499 | ValLoss 0.5394 | TrainAcc 0.793 | ValAcc 0.791
+...
+Época 210 | TrainLoss 0.4615 | ValLoss 0.4534 | TrainAcc 0.825 | ValAcc 0.823
+Early stopping (época 219) melhor val_loss=0.4528
+```
+
+* Observa-se **rápida convergência** nas primeiras 50 épocas; depois estabilização com pequenas melhorias.
+* Early stopping ao redor de ~219 épocas.
+
 
 ## 6. Training and Testing Strategy
-<!-- Estratégias de treino, validação e teste -->
 
 ### 6.1 Data Split
-<!-- Proporção usada (treino/validação/teste) e critérios de separação -->
+
+* `train / val / test = 70% / 15% / 15%` com **stratify** para preservar distribuição de classes.
 
 ### 6.2 Validation Strategy
-<!-- Uso de k-fold cross-validation ou validação simples -->
+
+* Validação simples (conjunto de validação dedicado) usada para seleção de hiperparâmetros e early stopping.
 
 ### 6.3 Reproducibility
-<!-- Seeds fixadas, controle de aleatoriedade -->
+
+* Seed fixada via `np.random.default_rng(42)` e `random_state=42` nos `train_test_split`.
 
 ### 6.4 Overfitting Prevention
-<!-- Estratégias aplicadas: early stopping, regularização, etc. -->
 
----
+* Regularização L2 em todos os pesos.
+* Early stopping baseado em `val_loss`.
+* Batch training (mini-batch) fornece ruído útil ao otimizar.
+
 
 ## 7. Error Curves and Visualization
-<!-- Análise gráfica do desempenho -->
 
-### 7.1 Loss Curves
-<!-- Gráficos de perda (treino e validação) ao longo das épocas -->
+### 7.1 Loss and Accuracy Curves
 
-### 7.2 Accuracy Curves
-<!-- Gráficos de acurácia (treino e validação) ao longo das épocas -->
+**Figura:** Curva de Loss e Acurácia (treino vs validação).
 
-### 7.3 Analysis of Learning Behavior
-<!-- Interpretação: overfitting, underfitting, convergência -->
+![Figura 4 — Curva de Loss e Acurácia (treino vs validação)](assets/4.png)
 
----
+### 7.2 Analysis of Learning Behavior
+
+* Treino e validação converge próximos e sem divergência acentuada → **overfitting limitado** graças a L2 + early stopping.
+* Acurácia de validação estabilizou ~0.823, indicando bom ajuste do modelo.
+
 
 ## 8. Evaluation Metrics
-<!-- Avaliação final do modelo -->
 
-### 8.1 Metrics Overview
-<!-- Métricas utilizadas: acurácia, precisão, recall, F1-score, etc. -->
+### 8.1 Test Metrics (resultado final)
 
-### 8.2 Confusion Matrix
-<!-- Matriz de confusão e análise dos erros mais comuns -->
+Resultados calculados no conjunto de **teste**:
 
-### 8.3 ROC and AUC
-<!-- Curvas ROC e AUC (caso aplicável) -->
+```
+MÉTRICAS TESTE
+Acurácia : 0.8195
+Precisão : 0.7897
+Recall   : 0.7690
+F1-score : 0.7771
+```
 
-### 8.4 Results Summary
-<!-- Tabelas e comparações de desempenho -->
+### 8.2 Baseline (majority class)
 
-### 8.5 Discussion
-<!-- Interpretação dos resultados: pontos fortes, limitações -->
+Classe majoritária no teste: `2` Baseline (predizer sempre a classe majoritária):
 
----
+```
+MÉTRICAS BASELINE (Majority Class)
+Acurácia : 0.4708
+Precisão : 0.1569
+Recall   : 0.3333
+F1-score : 0.2134
+```
+
+**Comparação:** o MLP supera claramente o baseline em todas as métricas (ex.: acurácia 0.8195 vs 0.4708).
+
+### 8.3 Confusion Matrix
+
+**Figura:** Matriz de Confusão (Teste):
+
+![Figura 5 — Matriz de Confusão (Teste) — interpretações a comentar](assets/5.png)
+
+**Classe "Graduate (1.0)"**  
+O modelo obteve o melhor desempenho nesta classe, com **4088 acertos** e **poucos erros de confusão**.  
+Representa também a **classe majoritária**, o que explica a facilidade de identificação.  
+Poucos graduados foram confundidos como “Dropout” (242) ou “Enrolled” (84).
+
+**Classe "Enrolled (0.5)"**  
+A segunda melhor classe em termos de acerto (**2568 corretos**).  
+Alguns alunos ainda matriculados foram incorretamente classificados como “Dropout” (**341**) — possivelmente devido a perfis de desempenho inicial similares.  
+Menor confusão com “Graduate” (**205**) indica que o modelo diferencia razoavelmente alunos ativos dos formados.
+
+**Classe "Dropout (0.0)"**  
+A classe mais **problemática**: apenas **1028 acertos** contra **820 erros (211+609)**.  
+Quase **600 alunos que abandonaram o curso** foram classificados como “Graduate” — mostrando que o modelo tem **dificuldade em detectar evasão**, o que é crítico neste tipo de aplicação.  
+Essa confusão indica que **o modelo tende a superestimar o sucesso acadêmico**, possivelmente por conta do desbalanceamento do dataset.
+
+
+
+### 8.4 Decision Boundary (PCA 2D)
+
+**Figura:** Decisão no espaço PCA (PC1 × PC2) com pontos corretos/errados do conjunto de teste.
+
+![Figura 6 — Decisão no espaço PCA (PC1 × PC2) com pontos corretos/errados do conjunto de teste](assets/6.png)
+
 
 ## 9. Conclusion
-<!-- Resumo e principais aprendizados -->
 
 ### 9.1 Key Findings
-<!-- Síntese dos resultados e desempenho geral do modelo -->
+
+* MLP implementado do zero (NumPy) atingiu **Acurácia = 0.8195** e **F1 ≈ 0.7771** no conjunto de teste, superando largamente o baseline majoritário.
+* PCA mostrou separação parcial entre classes, justificando uso de modelo não-linear (MLP).
 
 ### 9.2 Limitations
-<!-- Limitações identificadas no trabalho -->
 
-### 9.3 Future Work
-<!-- Ideias para melhoria ou extensões futuras -->
+* Desbalanceamento de classes requer análise adicional (class weighting, oversampling/undersampling).
+* Remoção de outliers foi feita por limites manuais — abordagem automática (IQR, isolation forest) poderia ser comparada.
+* Implementação atual usa `tanh`; testar `ReLU` + batchnorm pode acelerar/aperfeiçoar treino.
+
+## Appendix — Código de Treino e Avaliação
+
+Arquivo Jupyter implementando o MLP ![aqui](https://github.com/lucasouzamil/mlp-classification/blob/mkdocs/main.ipynb).
+
+
