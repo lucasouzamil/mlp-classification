@@ -105,7 +105,10 @@ plugins:
   - glightbox
   - git-revision-date-localized:
       enable_creation_date: true
-  - git-authors
+  - git-authors:
+    - name: "Eduardo Selber Castanho"
+    - name: "Henrique Fazzio Badin"
+    - name: "Lucas Fernando de Souza Lima"
   - git-committers:
       repository: lucasouzamil/mlp-classification
       branch: main
