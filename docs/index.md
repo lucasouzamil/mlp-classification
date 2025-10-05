@@ -202,7 +202,6 @@ pca_result = pca.fit_transform(df_scaled[numeric_cols])
 * Outliers removidos com base em limites definidos manualmente.
 * Variáveis categóricas convertidas por one-hot encoding.
 * Normalização Min–Max aplicada a todas as variáveis numéricas.
-* PCA confirmou boa estrutura dos dados para classificação multiclasse.
 
 
 ## 4. MLP Implementation
