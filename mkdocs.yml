@@ -108,7 +108,7 @@ plugins:
   - git-authors
   - git-committers:
       repository: lucasouzamil/mlp-classification
-      branch: mkdocs
+      branch: main
   - search
   - badges
   - minify:
