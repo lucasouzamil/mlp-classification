@@ -1,1 +1,5 @@
-.venv
+site/
+env/
+.cache/
+.vscode/
+target/
