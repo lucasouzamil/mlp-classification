@@ -310,13 +310,3 @@ pca_result = pca.fit_transform(df_scaled[numeric_cols])
 
 ### 9.3 Future Work
 <!-- Ideias para melhoria ou extensões futuras -->
-
----
-
-## 10. References
-<!-- Lista de todas as fontes utilizadas: datasets, papers, bibliotecas, links -->
-
----
-
-## Appendix (optional)
-<!-- Códigos completos, logs, screenshots, links de notebooks ou GitHub -->
