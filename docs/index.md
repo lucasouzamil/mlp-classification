@@ -34,7 +34,6 @@ O objetivo é prever o **status final do aluno** — *dropout*, *enrolled* ou *g
 
 O dataset possui **36 variáveis** e **4.424 instâncias**, todas **sem valores nulos ou duplicados**. As features incluem dados pessoais, histórico acadêmico, desempenho em disciplinas e indicadores macroeconômicos.  
 
----
 
 ### 2.1 Feature Description
 
@@ -78,45 +77,133 @@ O dataset possui **36 variáveis** e **4.424 instâncias**, todas **sem valores 
 | GDP | Continuous | Produto Interno Bruto | valor contínuo |
 | **Target** | Categorical | Situação final do aluno | *Dropout*, *Enrolled*, *Graduate* |
 
----
-
 ### 2.2 Target Variable
 
 A variável **Target** representa a situação final do estudante ao término do curso:
-    - **Dropout (0):** o aluno abandonou o curso;  
-    - **Enrolled (1):** o aluno ainda está matriculado;  
-    - **Graduate (2):** o aluno concluiu o curso com sucesso.  
 
----
+- **Dropout (0):** o aluno abandonou o curso  
+- **Enrolled (1):** o aluno ainda está matriculado  
+- **Graduate (2):** o aluno concluiu o curso com sucesso
 
 ### 2.3 Data Issues
 
 O dataset já foi **pré-processado e limpo** pelos autores originais, não apresentando:
+
 - Valores ausentes (`NaN`);
 - Duplicatas;
 - Outliers sem explicação evidente.  
 
----
-
 ## 3. Data Cleaning and Normalization
-<!-- Limpeza e pré-processamento dos dados -->
 
-### Handling Missing Values
-<!-- Estratégias usadas: remoção, imputação (média, mediana, etc.) -->
+A etapa de **limpeza e normalização** foi realizada para garantir a qualidade dos dados e preparar o conjunto para o treinamento da rede MLP. O processo incluiu inspeção inicial, remoção de outliers, codificação de variáveis categóricas, normalização numérica e análise exploratória com **PCA (Principal Component Analysis)**.
 
-### Handling Outliers
-<!-- Estratégias de detecção e tratamento de outliers -->
+### 3.1 Initial Inspection
 
-### Encoding Categorical Variables
-<!-- One-hot encoding, label encoding ou outra técnica utilizada -->
+Após o carregamento do dataset (`train.csv`), foi feita uma análise exploratória inicial com `pandas` e `matplotlib` para verificar estrutura, tipos de dados e possíveis problemas de consistência.
 
-### Normalization or Standardization
-<!-- Método usado (Min-Max, Z-score, etc.) e justificativa -->
+```python
+df.info()
+df.isnull().sum()
+df.describe().transpose()
+df.hist(bins=30, figsize=(20, 15))
+```
 
-### Preprocessing Summary
-<!-- Comparação antes/depois e breve resumo das transformações -->
+* Nenhum valor nulo foi encontrado.
+* Não há colunas duplicadas.
+* As distribuições mostram amplitudes diferentes entre variáveis, o que justifica a posterior normalização.
 
----
+**Figura 1 — Distribuição inicial das features**
+
+![Figura 1 — Distribuição inicial das features](assets/1.png)
+
+### 3.2 Outlier Detection and Removal
+
+Foram definidos **limites manuais de plausibilidade** (*bounds*) para cada variável quantitativa, baseados em conhecimento de domínio e na distribuição dos dados. A função `remove_outliers_by_bounds()` filtrou linhas fora desses intervalos.
+
+```python
+df_sem_outliers = remove_outliers_by_bounds(df)
+```
+
+#### Principais resultados:
+
+| Variável                                       | Intervalo Mantido | Linhas Removidas |
+| :--------------------------------------------- | :---------------- | :--------------- |
+| Previous qualification (grade)                 | [80, 180]         | 13               |
+| Admission grade                                | [90, 180]         | 16               |
+| Age at enrollment                              | [16, 60]          | 33               |
+| Curricular units 1st sem (approved)            | [0, 15]           | 108              |
+| Curricular units 1st sem (without evaluations) | [0, 4]            | 127              |
+| Curricular units 2nd sem (without evaluations) | [0, 1]            | 1.011            |
+| Inflation rate                                 | [-1.5, 3.5]       | 7.327            |
+| GDP                                            | [-4.5, 3.5]       | 5.082            |
+
+**Resumo final:** 76.518 → 62.502 linhas após limpeza.
+
+**Figura 2 — Distribuição após remoção de outliers**
+
+![Figura 2 — Distribuição após remoção de outliers](assets/2.png)
+
+A filtragem removeu registros com valores extremos (principalmente em indicadores macroeconômicos e notas médias), reduzindo ruídos sem comprometer o volume de dados.
+
+### 3.3 Feature Encoding
+
+Para transformar variáveis categóricas em numéricas, foi aplicada **codificação one-hot** com `pandas.get_dummies()`, preservando todas as categorias:
+
+```python
+df_encoded = pd.get_dummies(df, columns=[
+    "Nacionality", "Marital status", "Application mode", "Course",
+    "Previous qualification", "Mother's qualification", "Father's qualification",
+    "Mother's occupation", "Father's occupation"
+])
+```
+
+* As novas colunas (`uint8`) representaram corretamente cada categoria.
+* O `Target` foi mapeado para valores numéricos:
+
+* `Graduate = 1.0`
+* `Dropout = 0.5`
+* `Enrolled = 0.0`
+
+### 3.4 Normalization
+
+Como as features possuem escalas diferentes (por exemplo, notas entre 0–200 e idades entre 16–60), aplicou-se a **normalização Min–Max**, escalando todos os valores para o intervalo [0, 1]:
+
+```python
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+df_scaled[numeric_cols] = scaler.fit_transform(df_encoded[numeric_cols])
+```
+
+Essa transformação assegura que todas as variáveis tenham o mesmo peso relativo no cálculo dos gradientes durante o treinamento do MLP.
+
+
+### 3.5 Dimensionality Reduction (PCA)
+
+Por fim, aplicou-se uma **Análise de Componentes Principais (PCA)** para verificar a variância explicada e explorar a separabilidade entre classes.
+
+```python
+from sklearn.decomposition import PCA
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(df_scaled[numeric_cols])
+```
+
+* **PC1:** 34% da variância explicada
+* **PC2:** 21% da variância explicada
+* **Total:** ~55% da variância capturada pelos dois primeiros componentes
+
+**Figura 3 — PCA (PC1 vs PC2) colorido por classe**
+
+![Figura 3 — PCA (PC1 vs PC2) colorido por classe](assets/3.png)
+
+
+### 3.6 Summary
+
+* Nenhum dado ausente ou duplicado encontrado.
+* Outliers removidos com base em limites definidos manualmente.
+* Variáveis categóricas convertidas por one-hot encoding.
+* Normalização Min–Max aplicada a todas as variáveis numéricas.
+* PCA confirmou boa estrutura dos dados para classificação multiclasse.
+
 
 ## 4. MLP Implementation
 <!-- Implementação da rede neural -->
