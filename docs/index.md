@@ -177,11 +177,17 @@ df_scaled[numeric_cols] = scaler.fit_transform(df_encoded[numeric_cols])
 ```
 
 Essa transformação assegura que todas as variáveis tenham o mesmo peso relativo no cálculo dos gradientes durante o treinamento do MLP.
-
-
+ 
 ### 3.5 Dimensionality Reduction (PCA)
 
-Por fim, aplicou-se uma **Análise de Componentes Principais (PCA)** para verificar a variância explicada e explorar a separabilidade entre classes.
+Devido ao grande número de variáveis presentes no dataset — após o *one-hot encoding* havia **centenas de features numéricas** — aplicamos uma **Análise de Componentes Principais (PCA)** com o objetivo de **reduzir a dimensionalidade** dos dados e **facilitar a visualização** da separabilidade entre as classes.
+
+A redução de dimensionalidade é útil neste caso porque:
+- Diminui a complexidade computacional para análises exploratórias.
+- Permite observar padrões e agrupamentos de classes em um espaço bidimensional.
+- Ajuda a verificar se há algum grau de separação natural entre as classes antes do treinamento do MLP.
+
+O PCA foi aplicado sobre as colunas numéricas normalizadas, extraindo os **dois primeiros componentes principais**:
 
 ```python
 from sklearn.decomposition import PCA
@@ -189,13 +195,20 @@ pca = PCA(n_components=2)
 pca_result = pca.fit_transform(df_scaled[numeric_cols])
 ```
 
-* **PC1:** 34% da variância explicada
-* **PC2:** 21% da variância explicada
-* **Total:** ~55% da variância capturada pelos dois primeiros componentes
+Os resultados mostraram que:
+
+* **PC1:** explica aproximadamente **34%** da variância total
+* **PC2:** explica aproximadamente **21%** da variância
+* **Total:** cerca de **55%** da variância foi capturada pelos dois primeiros componentes
+
+Isso indica que, embora a maior parte da informação ainda esteja distribuída entre diversas dimensões, é possível visualizar parte da estrutura dos dados em duas dimensões.
+
+A figura abaixo mostra a projeção dos dados no plano formado pelos dois primeiros componentes principais, com as classes representadas por cores diferentes.
 
 **Figura 3 — PCA (PC1 vs PC2) colorido por classe**
 
 ![Figura 3 — PCA (PC1 vs PC2) colorido por classe](assets/3.png)
+
 
 
 ### 3.6 Summary
@@ -533,6 +546,18 @@ Essa confusão indica que **o modelo tende a superestimar o sucesso acadêmico**
 * Desbalanceamento de classes requer análise adicional (class weighting, oversampling/undersampling).
 * Remoção de outliers foi feita por limites manuais — abordagem automática (IQR, isolation forest) poderia ser comparada.
 * Implementação atual usa `tanh`; testar `ReLU` + batchnorm pode acelerar/aperfeiçoar treino.
+
+## 10. Referências
+
+1. **Material de apoio — Artificial Neural Networks and Deep Learning**  
+   [https://insper.github.io/ann-dl/](https://insper.github.io/ann-dl/)
+
+2. **Kaggle — Academic Success Classifier Competition**  
+   [https://www.kaggle.com/competitions/academic-success-classifier/data](https://www.kaggle.com/competitions/academic-success-classifier/data)
+
+3. **UCI Machine Learning Repository — Predict Students’ Dropout and Academic Success**  
+   [https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success](https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success)
+
 
 ## Appendix — Código de Treino e Avaliação
 
