@@ -237,9 +237,9 @@ Justificativa curta:
 
 * **Cross-entropy (categorical)** combinada com **regularização L2** aplicada a todos os pesos:
 
-  [
-  \text{loss} = -\frac{1}{B}\sum_{i=1}^{B} \sum_{k=1}^{K} y_{ik}\log(\hat{y}*{ik}) ;+; \lambda \sum*{\ell} |W^{(\ell)}|^2
-  ]
+$$
+\text{loss} = -\frac{1}{B}\sum_{i=1}^{B}\sum_{k=1}^{K} y_{ik}\log(\hat{y}_{ik} + \varepsilon) + \lambda \sum_{\ell} \|W^{(\ell)}\|^2
+$$
 
   * `B` é o tamanho do mini-batch.
   * A combinação cross-entropy + softmax simplifica a derivada do output para `(yhat - y_onehot)/B`, o que facilita o cálculo de gradientes.
